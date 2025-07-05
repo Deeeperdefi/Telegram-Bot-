@@ -9,6 +9,7 @@ from telegram.constants import ChatMemberStatus
 # Reads the variables from Render's Environment tab.
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 TELEGRAM_GROUP_ID = os.environ.get("TELEGRAM_GROUP_ID")
+# Channel ID is no longer needed for verification, but we keep the variable for the link
 TELEGRAM_CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID") 
 
 # --- Your Links (Updated as per your request) ---
@@ -17,11 +18,11 @@ YOUTUBE_URL = "https://cutt.ly/GrYcicUY"
 X_URL = "https://x.com/ifarttoken"
 FACEBOOK_URL = "https://web.facebook.com/cryptoadvertiser11"
 SPONSOR_URL = "https://www.profitableratecpm.com/h7636fr3k?key=e9c1b80bf6645940264046b0a5f6ce72"
-MINI_APP_URL = "https://brilliant-toffee-0b87e0.netlify.app/" # <--- UPDATED MINI APP LINK
+MINI_APP_URL = "https://brilliant-toffee-0b87e0.netlify.app/"
 
 # Telegram join links (UPDATED WITH YOUR LINKS)
 TELEGRAM_GROUP_URL = "https://t.me/+h2YUHTxOo7ZlYWE8"
-TELEGRAM_CHANNEL_URL = "https://t.me/+0jLaZAA5f0dkNTRk"
+TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken" # <--- Using your public channel link
 
 
 # --- Bot Data Storage (for demonstration) ---
@@ -41,16 +42,15 @@ TASKS = [
         "intro": "1️⃣ First, you must join our official Telegram Group. Click the button below to join, then come back and click 'Verify'.",
         "button_text": "Join Group 💬",
         "url": TELEGRAM_GROUP_URL,
-        "verify": True,
+        "verify": True, # This is still mandatory
         "verify_id": "TELEGRAM_GROUP_ID"
     },
     {
         "name": "channel",
-        "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel. Click the button below to join, then come back and click 'Verify'.",
+        "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel to stay updated.",
         "button_text": "Join Channel 📢",
         "url": TELEGRAM_CHANNEL_URL,
-        "verify": True,
-        "verify_id": "TELEGRAM_CHANNEL_ID"
+        "verify": False, # This is NO LONGER mandatory
     },
     {
         "name": "sponsor",
@@ -185,8 +185,9 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
 # --- Main Bot Logic ---
 def main() -> None:
     """Start the bot and set up the daily job."""
-    if not all([BOT_TOKEN, TELEGRAM_GROUP_ID, TELEGRAM_CHANNEL_ID]):
-        logger.error("FATAL: One or more required environment variables are not set.")
+    # The bot now only requires the GROUP_ID to be set for verification
+    if not all([BOT_TOKEN, TELEGRAM_GROUP_ID]):
+        logger.error("FATAL: BOT_TOKEN or TELEGRAM_GROUP_ID environment variables are not set.")
         return
 
     application = Application.builder().token(BOT_TOKEN).build()
