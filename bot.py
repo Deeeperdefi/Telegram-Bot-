@@ -24,7 +24,8 @@ TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken"
 
 # --- Bot Data Storage (for demonstration) ---
 # user_progress maps user_id to their current step.
-# 0-5 are tasks, 98 means "waiting for screenshot", 99 means "completed".
+# Even numbers (0, 2, 4...) are for performing a task.
+# Odd numbers (1, 3, 5...) are for submitting a screenshot for that task.
 user_progress = {}
 daily_reminder_users = set()
 
@@ -38,19 +39,19 @@ logger = logging.getLogger(__name__)
 TASKS = [
     {
         "name": "group",
-        "intro": "1️⃣ First, please join our official Telegram Group.",
-        "button_text": "Join Group �",
+        "intro": "1️⃣ First, please join our official Telegram Group. Click the button below, then come back.",
+        "button_text": "Join Group 💬",
         "url": TELEGRAM_GROUP_URL,
     },
     {
         "name": "channel",
         "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel to stay updated.",
-        "button_text": "Join Channel 📢",
+        "button_text": "Join Channel �",
         "url": TELEGRAM_CHANNEL_URL,
     },
     {
         "name": "sponsor",
-        "intro": "3️⃣ Please support us by visiting our sponsor's page.",
+        "intro": "3️⃣ Please visit our sponsor's site. Stay on the site for at least 30 seconds before taking your screenshot.",
         "button_text": "Visit our Sponsor ❤️",
         "url": SPONSOR_URL,
     },
@@ -74,21 +75,15 @@ TASKS = [
     }
 ]
 
-# --- Helper Function to Send Tasks ---
-async def send_task_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, step: int):
-    """Sends the message for the user's current task step."""
-    if step < len(TASKS):
-        task = TASKS[step]
-        
-        buttons = [
-            [InlineKeyboardButton(task["button_text"], url=task["url"])],
-            [InlineKeyboardButton("✅ I have completed this task", callback_data="task_done")]
-        ]
-        
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await context.bot.send_message(chat_id=chat_id, text=task["intro"], reply_markup=reply_markup)
-    else:
-        # This part is now only called after the screenshot is submitted
+# --- Helper Function to manage conversation flow ---
+async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    """Determines what message to send based on the user's progress."""
+    step = user_progress.get(chat_id, 0)
+    task_index = step // 2
+    is_screenshot_step = step % 2 != 0
+
+    if task_index >= len(TASKS):
+        # User has finished all tasks and screenshots
         user_progress[chat_id] = 99
         if chat_id not in daily_reminder_users:
             daily_reminder_users.add(chat_id)
@@ -98,6 +93,22 @@ async def send_task_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, st
         keyboard = [[InlineKeyboardButton("🚀 PLAY iFart Mini App!", web_app=WebAppInfo(url=MINI_APP_URL))]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(chat_id=chat_id, text=final_message, reply_markup=reply_markup)
+        return
+
+    if is_screenshot_step:
+        # Ask for a screenshot
+        screenshot_request_text = (
+            f"👍 Now, please send a screenshot as proof for **Task {task_index + 1}**.\n\n"
+            "⚠️ *All submissions will be reviewed by our team before your airdrop withdrawal is processed. Honest participation is required.*"
+        )
+        await context.bot.send_message(chat_id=chat_id, text=screenshot_request_text, parse_mode='Markdown')
+    else:
+        # Send the next task
+        task = TASKS[task_index]
+        buttons = [[InlineKeyboardButton(task["button_text"], url=task["url"], callback_data="task_link_clicked")]]
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await context.bot.send_message(chat_id=chat_id, text=task["intro"], reply_markup=reply_markup)
+
 
 # --- Command and Callback Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -107,49 +118,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"User {user.first_name} ({chat_id}) started the bot.")
     
     user_progress[chat_id] = 0
-    await send_task_message(context, chat_id, 0)
+    await advance_flow(context, chat_id)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles all button presses (callbacks)."""
+    """Handles the press of a task link button."""
     query = update.callback_query
-    await query.answer()
+    await query.answer() # Acknowledge the button press
     
     user_id = query.from_user.id
-    current_step = user_progress.get(user_id, -1)
     
-    if current_step == -1:
-        await query.edit_message_text("Something went wrong. Please type /start to begin again.")
-        return
-
-    if query.data == "task_done":
-        # Check if it was the last task
-        if current_step == len(TASKS) - 1:
-            # Transition to the screenshot submission step
-            user_progress[user_id] = 98 # 98 means "waiting for screenshot"
-            screenshot_request_text = (
-                "👍 Fantastic! You've completed all the social tasks.\n\n"
-                "To finalize your entry, please send a single screenshot that shows you have completed the tasks.\n\n"
-                "⚠️ *All submissions will be reviewed by our team before your airdrop withdrawal is processed. Honest participation is required.*"
-            )
-            await query.edit_message_text(text=screenshot_request_text, parse_mode='Markdown')
-        else:
-            # It wasn't the last task, move to the next one
-            await query.edit_message_text(f"✅ Task {current_step + 1} verified! Here is the next one:")
-            user_progress[user_id] += 1
-            await send_task_message(context, user_id, user_progress[user_id])
+    # Move user to the screenshot submission stage for the current task
+    user_progress[user_id] += 1
+    await query.message.delete() # Clean up the old message
+    await advance_flow(context, user_id)
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles when a user sends a photo."""
     user_id = update.effective_user.id
-    current_step = user_progress.get(user_id, -1)
+    step = user_progress.get(user_id, -1)
+    is_screenshot_step = step % 2 != 0
 
     # Check if we are expecting a screenshot from this user
-    if current_step == 98:
+    if is_screenshot_step:
         await update.message.reply_text(
-            "✅ Thank you! Your proof has been received and will be reviewed by our team."
+            "✅ Thank you! Your proof has been received. Here is the next task."
         )
-        # Now, give the user the final reward
-        await send_task_message(context, user_id, len(TASKS))
+        # Move user to the next task
+        user_progress[user_id] += 1
+        await advance_flow(context, user_id)
     else:
         # Ignore photos sent at the wrong time
         logger.info(f"User {user_id} sent a photo, but it was not expected.")
