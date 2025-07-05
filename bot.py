@@ -17,7 +17,7 @@ YOUTUBE_URL = "https://cutt.ly/GrYcicUY"
 X_URL = "https://x.com/ifarttoken"
 FACEBOOK_URL = "https://web.facebook.com/cryptoadvertiser11"
 SPONSOR_URL = "https://www.profitableratecpm.com/h7636fr3k?key=e9c1b80bf6645940264046b0a5f6ce72"
-MINI_APP_URL = "https://your-ifart-mini-app.com"   # <--- PASTE YOUR MINI APP LINK HERE
+MINI_APP_URL = "https://brilliant-toffee-0b87e0.netlify.app/" # <--- UPDATED MINI APP LINK
 
 # Telegram join links (UPDATED WITH YOUR LINKS)
 TELEGRAM_GROUP_URL = "https://t.me/+h2YUHTxOo7ZlYWE8"
