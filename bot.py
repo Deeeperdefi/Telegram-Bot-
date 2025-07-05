@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import logging
 import datetime
 import os
@@ -40,7 +41,7 @@ TASKS = [
         "intro": "1️⃣ First, please join our official Telegram Group.",
         "button_text": "Join Group 💬",
         "url": TELEGRAM_GROUP_URL,
-        "verify": False, # Verification is now disabled
+        "verify": False,
     },
     {
         "name": "channel",
@@ -59,7 +60,7 @@ TASKS = [
     {
         "name": "youtube",
         "intro": "4️⃣ Next, please subscribe to our YouTube Channel.",
-        "button_text": "Subscribe on YouTube �",
+        "button_text": "Subscribe on YouTube 🎬",
         "url": YOUTUBE_URL,
         "verify": False
     },
@@ -175,4 +176,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-�
