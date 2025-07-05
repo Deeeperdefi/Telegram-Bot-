@@ -8,9 +8,6 @@ from telegram.constants import ChatMemberStatus
 # --- Configuration ---
 # Reads the variables from Render's Environment tab.
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-TELEGRAM_GROUP_ID = os.environ.get("TELEGRAM_GROUP_ID")
-# Channel ID is no longer needed for verification, but we keep the variable for the link
-TELEGRAM_CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID") 
 
 # --- Your Links (Updated as per your request) ---
 # Main social links
@@ -20,9 +17,9 @@ FACEBOOK_URL = "https://web.facebook.com/cryptoadvertiser11"
 SPONSOR_URL = "https://www.profitableratecpm.com/h7636fr3k?key=e9c1b80bf6645940264046b0a5f6ce72"
 MINI_APP_URL = "https://brilliant-toffee-0b87e0.netlify.app/"
 
-# Telegram join links (UPDATED WITH YOUR LINKS)
+# Telegram join links
 TELEGRAM_GROUP_URL = "https://t.me/+h2YUHTxOo7ZlYWE8"
-TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken" # <--- Using your public channel link
+TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken"
 
 
 # --- Bot Data Storage (for demonstration) ---
@@ -35,40 +32,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- UPDATED Task Definitions ---
+# --- SIMPLIFIED Task Definitions ---
+# ALL TASKS ARE NOW OPTIONAL. NO VERIFICATION.
 TASKS = [
     {
         "name": "group",
-        "intro": "1️⃣ First, you must join our official Telegram Group. Click the button below to join, then come back and click 'Verify'.",
+        "intro": "1️⃣ First, please join our official Telegram Group.",
         "button_text": "Join Group 💬",
         "url": TELEGRAM_GROUP_URL,
-        "verify": True, # This is still mandatory
-        "verify_id": "TELEGRAM_GROUP_ID"
+        "verify": False, # Verification is now disabled
     },
     {
         "name": "channel",
         "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel to stay updated.",
         "button_text": "Join Channel 📢",
         "url": TELEGRAM_CHANNEL_URL,
-        "verify": False, # This is NO LONGER mandatory
+        "verify": False,
     },
     {
         "name": "sponsor",
-        "intro": "3️⃣ Please support us by visiting our sponsor's page. Click the button below to visit, then return here.",
+        "intro": "3️⃣ Please support us by visiting our sponsor's page.",
         "button_text": "Visit our Sponsor ❤️",
         "url": SPONSOR_URL,
         "verify": False
     },
     {
         "name": "youtube",
-        "intro": "4️⃣ Great! Now, please subscribe to our YouTube Channel. Click the button below, subscribe, and then return here.",
-        "button_text": "Subscribe on YouTube 🎬",
+        "intro": "4️⃣ Next, please subscribe to our YouTube Channel.",
+        "button_text": "Subscribe on YouTube �",
         "url": YOUTUBE_URL,
         "verify": False
     },
     {
         "name": "twitter",
-        "intro": "5️⃣ Almost there! Follow our X (Twitter) profile to stay up-to-date with the latest news.",
+        "intro": "5️⃣ Almost there! Follow our X (Twitter) profile.",
         "button_text": "Follow on X 🐦",
         "url": X_URL,
         "verify": False
@@ -88,13 +85,11 @@ async def send_task_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, st
     if step < len(TASKS):
         task = TASKS[step]
         
+        # All tasks will now just have a "Next Task" button
         buttons = [
-            [InlineKeyboardButton(task["button_text"], url=task["url"])]
+            [InlineKeyboardButton(task["button_text"], url=task["url"])],
+            [InlineKeyboardButton("➡️ Next Task", callback_data="next_task")]
         ]
-        if task["verify"]:
-            buttons.append([InlineKeyboardButton(f"✅ Verify Join", callback_data=f"verify_{task['name']}")])
-        else:
-            buttons.append([InlineKeyboardButton("➡️ Next Task", callback_data="next_task")])
         
         reply_markup = InlineKeyboardMarkup(buttons)
         await context.bot.send_message(chat_id=chat_id, text=task["intro"], reply_markup=reply_markup)
@@ -131,37 +126,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text("Something went wrong. Please type /start to begin again.")
         return
 
-    # Check for verification clicks
-    if query.data.startswith("verify_"):
-        task = TASKS[current_step]
-        chat_to_check = os.environ.get(task["verify_id"])
-        
-        if not chat_to_check:
-            logger.error(f"Environment variable {task['verify_id']} not set!")
-            await context.bot.answer_callback_query(query.id, "Server configuration error. Please contact admin.", show_alert=True)
-            return
-
-        try:
-            member = await context.bot.get_chat_member(chat_id=chat_to_check, user_id=user_id)
-            if member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]:
-                await query.edit_message_text(f"✅ Verification successful! Thank you for joining the {task['name']}.")
-                user_progress[user_id] += 1
-                await send_task_message(context, user_id, user_progress[user_id])
-            else:
-                await context.bot.answer_callback_query(query.id, f"❌ Verification failed. You are not a member of the {task['name']}. Please join and try again.", show_alert=True)
-        except Exception as e:
-            logger.error(f"Error verifying user {user_id} in {chat_to_check}: {e}")
-            await context.bot.answer_callback_query(query.id, "An error occurred. Make sure the bot is an admin in the group/channel and the ID is correct.", show_alert=True)
-        return
-
     # Logic for "Next Task" button
     if query.data == "next_task":
-        if not TASKS[current_step]["verify"]:
-            await query.edit_message_text(f"Task {current_step + 1} acknowledged. Here is the next one:")
-            user_progress[user_id] += 1
-            await send_task_message(context, user_id, user_progress[user_id])
-        else:
-            await context.bot.answer_callback_query(query.id, "Please complete the current verification step.", show_alert=True)
+        await query.edit_message_text(f"Task {current_step + 1} acknowledged. Here is the next one:")
+        user_progress[user_id] += 1
+        await send_task_message(context, user_id, user_progress[user_id])
 
 # --- Daily Reminder Functionality ---
 async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -185,9 +154,9 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
 # --- Main Bot Logic ---
 def main() -> None:
     """Start the bot and set up the daily job."""
-    # The bot now only requires the GROUP_ID to be set for verification
-    if not all([BOT_TOKEN, TELEGRAM_GROUP_ID]):
-        logger.error("FATAL: BOT_TOKEN or TELEGRAM_GROUP_ID environment variables are not set.")
+    # The bot now only requires the BOT_TOKEN to be set.
+    if not BOT_TOKEN:
+        logger.error("FATAL: BOT_TOKEN environment variable is not set.")
         return
 
     application = Application.builder().token(BOT_TOKEN).build()
@@ -206,3 +175,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+�
