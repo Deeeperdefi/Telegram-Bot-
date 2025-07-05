@@ -3,8 +3,7 @@ import logging
 import datetime
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from telegram.constants import ChatMemberStatus
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 # --- Configuration ---
 # Reads the variables from Render's Environment tab.
@@ -24,6 +23,8 @@ TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken"
 
 
 # --- Bot Data Storage (for demonstration) ---
+# user_progress maps user_id to their current step.
+# 0-5 are tasks, 98 means "waiting for screenshot", 99 means "completed".
 user_progress = {}
 daily_reminder_users = set()
 
@@ -33,50 +34,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- SIMPLIFIED Task Definitions ---
-# ALL TASKS ARE NOW OPTIONAL. NO VERIFICATION.
+# --- Task Definitions ---
 TASKS = [
     {
         "name": "group",
         "intro": "1️⃣ First, please join our official Telegram Group.",
-        "button_text": "Join Group 💬",
+        "button_text": "Join Group �",
         "url": TELEGRAM_GROUP_URL,
-        "verify": False,
     },
     {
         "name": "channel",
         "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel to stay updated.",
         "button_text": "Join Channel 📢",
         "url": TELEGRAM_CHANNEL_URL,
-        "verify": False,
     },
     {
         "name": "sponsor",
         "intro": "3️⃣ Please support us by visiting our sponsor's page.",
         "button_text": "Visit our Sponsor ❤️",
         "url": SPONSOR_URL,
-        "verify": False
     },
     {
         "name": "youtube",
         "intro": "4️⃣ Next, please subscribe to our YouTube Channel.",
         "button_text": "Subscribe on YouTube 🎬",
         "url": YOUTUBE_URL,
-        "verify": False
     },
     {
         "name": "twitter",
         "intro": "5️⃣ Almost there! Follow our X (Twitter) profile.",
         "button_text": "Follow on X 🐦",
         "url": X_URL,
-        "verify": False
     },
     {
         "name": "facebook",
         "intro": "6️⃣ Last one! Please like our Facebook page.",
         "button_text": "Like on Facebook 👍",
         "url": FACEBOOK_URL,
-        "verify": False
     }
 ]
 
@@ -86,15 +80,15 @@ async def send_task_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, st
     if step < len(TASKS):
         task = TASKS[step]
         
-        # All tasks will now just have a "Next Task" button
         buttons = [
             [InlineKeyboardButton(task["button_text"], url=task["url"])],
-            [InlineKeyboardButton("➡️ Next Task", callback_data="next_task")]
+            [InlineKeyboardButton("✅ I have completed this task", callback_data="task_done")]
         ]
         
         reply_markup = InlineKeyboardMarkup(buttons)
         await context.bot.send_message(chat_id=chat_id, text=task["intro"], reply_markup=reply_markup)
     else:
+        # This part is now only called after the screenshot is submitted
         user_progress[chat_id] = 99
         if chat_id not in daily_reminder_users:
             daily_reminder_users.add(chat_id)
@@ -127,11 +121,39 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text("Something went wrong. Please type /start to begin again.")
         return
 
-    # Logic for "Next Task" button
-    if query.data == "next_task":
-        await query.edit_message_text(f"Task {current_step + 1} acknowledged. Here is the next one:")
-        user_progress[user_id] += 1
-        await send_task_message(context, user_id, user_progress[user_id])
+    if query.data == "task_done":
+        # Check if it was the last task
+        if current_step == len(TASKS) - 1:
+            # Transition to the screenshot submission step
+            user_progress[user_id] = 98 # 98 means "waiting for screenshot"
+            screenshot_request_text = (
+                "👍 Fantastic! You've completed all the social tasks.\n\n"
+                "To finalize your entry, please send a single screenshot that shows you have completed the tasks.\n\n"
+                "⚠️ *All submissions will be reviewed by our team before your airdrop withdrawal is processed. Honest participation is required.*"
+            )
+            await query.edit_message_text(text=screenshot_request_text, parse_mode='Markdown')
+        else:
+            # It wasn't the last task, move to the next one
+            await query.edit_message_text(f"✅ Task {current_step + 1} verified! Here is the next one:")
+            user_progress[user_id] += 1
+            await send_task_message(context, user_id, user_progress[user_id])
+
+async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles when a user sends a photo."""
+    user_id = update.effective_user.id
+    current_step = user_progress.get(user_id, -1)
+
+    # Check if we are expecting a screenshot from this user
+    if current_step == 98:
+        await update.message.reply_text(
+            "✅ Thank you! Your proof has been received and will be reviewed by our team."
+        )
+        # Now, give the user the final reward
+        await send_task_message(context, user_id, len(TASKS))
+    else:
+        # Ignore photos sent at the wrong time
+        logger.info(f"User {user_id} sent a photo, but it was not expected.")
+
 
 # --- Daily Reminder Functionality ---
 async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -155,7 +177,6 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
 # --- Main Bot Logic ---
 def main() -> None:
     """Start the bot and set up the daily job."""
-    # The bot now only requires the BOT_TOKEN to be set.
     if not BOT_TOKEN:
         logger.error("FATAL: BOT_TOKEN environment variable is not set.")
         return
@@ -168,11 +189,15 @@ def main() -> None:
         job_queue.run_daily(send_daily_reminder, time=reminder_time, name="daily_reminder_job")
         logger.info(f"Daily reminder job scheduled for {reminder_time} UTC.")
 
+    # Register all the handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
+    # Add the new handler for photos
+    application.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))
 
     logger.info("Bot is starting...")
     application.run_polling()
 
 if __name__ == "__main__":
     main()
+�
