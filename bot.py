@@ -39,37 +39,37 @@ logger = logging.getLogger(__name__)
 TASKS = [
     {
         "name": "group",
-        "intro": "1️⃣ First, please join our official Telegram Group. Click the button below, then come back.",
-        "button_text": "Join Group 💬",
+        "intro": "1️⃣ First, please join our official Telegram Group. Click the button below, then come back and click 'Done' to submit your proof.",
+        "button_text": "Join Group �",
         "url": TELEGRAM_GROUP_URL,
     },
     {
         "name": "channel",
-        "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel to stay updated.",
+        "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel. Click the button below, then come back and click 'Done'.",
         "button_text": "Join Channel 📢",
         "url": TELEGRAM_CHANNEL_URL,
     },
     {
         "name": "sponsor",
-        "intro": "3️⃣ Please visit our sponsor's site. Stay on the site for at least 30 seconds before taking your screenshot.",
+        "intro": "3️⃣ Please visit our sponsor's site. Stay on the site for at least 30 seconds, then come back and click 'Done'.",
         "button_text": "Visit our Sponsor ❤️",
         "url": SPONSOR_URL,
     },
     {
         "name": "youtube",
-        "intro": "4️⃣ Next, please subscribe to our YouTube Channel.",
+        "intro": "4️⃣ Next, please subscribe to our YouTube Channel. Click the button below, then come back and click 'Done'.",
         "button_text": "Subscribe on YouTube 🎬",
         "url": YOUTUBE_URL,
     },
     {
         "name": "twitter",
-        "intro": "5️⃣ Almost there! Follow our X (Twitter) profile.",
+        "intro": "5️⃣ Almost there! Follow our X (Twitter) profile. Click the button below, then come back and click 'Done'.",
         "button_text": "Follow on X 🐦",
         "url": X_URL,
     },
     {
         "name": "facebook",
-        "intro": "6️⃣ Last one! Please like our Facebook page.",
+        "intro": "6️⃣ Last one! Please like our Facebook page. Click the button below, then come back and click 'Done'.",
         "button_text": "Like on Facebook 👍",
         "url": FACEBOOK_URL,
     }
@@ -105,7 +105,10 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     else:
         # Send the next task
         task = TASKS[task_index]
-        buttons = [[InlineKeyboardButton(task["button_text"], url=task["url"], callback_data="task_link_clicked")]]
+        buttons = [
+            [InlineKeyboardButton(task["button_text"], url=task["url"])],
+            [InlineKeyboardButton("✅ Done, Ready to Send Proof", callback_data="request_proof")]
+        ]
         reply_markup = InlineKeyboardMarkup(buttons)
         await context.bot.send_message(chat_id=chat_id, text=task["intro"], reply_markup=reply_markup)
 
@@ -121,16 +124,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await advance_flow(context, chat_id)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the press of a task link button."""
+    """Handles the press of the 'Done' button."""
     query = update.callback_query
-    await query.answer() # Acknowledge the button press
+    await query.answer()
     
     user_id = query.from_user.id
     
-    # Move user to the screenshot submission stage for the current task
-    user_progress[user_id] += 1
-    await query.message.delete() # Clean up the old message
-    await advance_flow(context, user_id)
+    if query.data == "request_proof":
+        # Delete the old message with the buttons
+        await query.message.delete()
+        # Move user to the screenshot submission stage for the current task
+        user_progress[user_id] += 1
+        await advance_flow(context, user_id)
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles when a user sends a photo."""
@@ -138,10 +143,10 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     step = user_progress.get(user_id, -1)
     is_screenshot_step = step % 2 != 0
 
-    # Check if we are expecting a screenshot from this user
     if is_screenshot_step:
+        # Send the warning/confirmation message
         await update.message.reply_text(
-            "✅ Thank you! Your proof has been received. Here is the next task."
+            "✅ Thank you! Your proof has been received and will be reviewed by our team. Here is the next task."
         )
         # Move user to the next task
         user_progress[user_id] += 1
@@ -196,3 +201,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+�
