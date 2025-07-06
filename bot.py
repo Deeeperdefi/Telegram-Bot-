@@ -46,7 +46,7 @@ TASKS = [
     {
         "name": "channel",
         "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel to stay updated.",
-        "button_text": "Join Channel �",
+        "button_text": "Join Channel 📢",
         "url": TELEGRAM_CHANNEL_URL,
     },
     {
@@ -196,4 +196,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-�
