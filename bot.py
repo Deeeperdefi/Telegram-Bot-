@@ -40,7 +40,7 @@ TASKS = [
     {
         "name": "group",
         "intro": "1️⃣ First, please join our official Telegram Group. Click the button below, then come back and click 'Done' to submit your proof.",
-        "button_text": "Join Group �",
+        "button_text": "Join Group 💬",
         "url": TELEGRAM_GROUP_URL,
     },
     {
@@ -70,7 +70,7 @@ TASKS = [
     {
         "name": "facebook",
         "intro": "6️⃣ Last one! Please like our Facebook page. Click the button below, then come back and click 'Done'.",
-        "button_text": "Like on Facebook 👍",
+        "button_text": "Like on Facebook �",
         "url": FACEBOOK_URL,
     }
 ]
