@@ -2,6 +2,7 @@
 import logging
 import datetime
 import os
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
@@ -33,14 +34,14 @@ logger = logging.getLogger(__name__)
 TASKS = [
     {
         "name": "group",
-        "intro": "🌟 *Step 1/6: Join Our Community*\n\nJoin our exclusive Telegram group to connect with other iFart enthusiasts and get the latest updates!",
+        "intro": "🌟 *Step 1/6: Join Our Community*\n\nJoin our exclusive Telegram group to connect with other iFart enthusiasts!",
         "button_text": "✨ Join Group",
         "url": TELEGRAM_GROUP_URL,
         "emoji": "💬"
     },
     {
         "name": "channel",
-        "intro": "🚀 *Step 2/6: Stay Updated*\n\nSubscribe to our official Telegram channel for important announcements and exclusive content!",
+        "intro": "🚀 *Step 2/6: Stay Updated*\n\nSubscribe to our official Telegram channel for important announcements!",
         "button_text": "📢 Join Channel",
         "url": TELEGRAM_CHANNEL_URL,
         "emoji": "📢"
@@ -54,7 +55,7 @@ TASKS = [
     },
     {
         "name": "youtube",
-        "intro": "🎬 *Step 4/6: Subscribe on YouTube*\n\nWatch our latest videos and tutorials to maximize your iFart experience!",
+        "intro": "🎬 *Step 4/6: Subscribe on YouTube*\n\nWatch our latest videos to maximize your iFart experience!",
         "button_text": "🎥 Subscribe",
         "url": YOUTUBE_URL,
         "emoji": "📺"
@@ -79,22 +80,22 @@ TASKS = [
 WELCOME_MESSAGE = """
 🎉 *Welcome to iFart Token!* 🎉
 
-Earn $IFART tokens by completing simple social tasks. Complete all 6 steps to unlock the iFart Mini App!
+Complete these 6 simple steps to unlock access to the exclusive iFart Mini App!
 
 📊 *Your Progress:* 0/6 tasks completed
-💰 *Potential Earnings:* 100 $IFART
+🔒 *App Status:* Locked
 
 Let's get started with the first task!
 """
 
 PROGRESS_BAR = {
-    0: "🟦⬜⬜⬜⬜⬜ 0%",
-    1: "🟦🟦⬜⬜⬜⬜ 16%",
-    2: "🟦🟦🟦⬜⬜⬜ 33%",
-    3: "🟦🟦🟦🟦⬜⬜ 50%",
-    4: "🟦🟦🟦🟦🟦⬜ 66%",
-    5: "🟦🟦🟦🟦🟦🟦 83%",
-    6: "🟩🟩🟩🟩🟩🟩 100%"
+    0: "🔒⬜⬜⬜⬜⬜ 0%",
+    1: "🔓🔒⬜⬜⬜⬜ 16%",
+    2: "🔓🔓🔒⬜⬜⬜ 33%",
+    3: "🔓🔓🔓🔒⬜⬜ 50%",
+    4: "🔓🔓🔓🔓🔒⬜ 66%",
+    5: "🔓🔓🔓🔓🔓🔒 83%",
+    6: "🔓🔓🔓🔓🔓🔓 100%"
 }
 
 # --- Helper Functions ---
@@ -114,12 +115,11 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
 
         final_message = (
             "🎊 *Congratulations!* 🎊\n\n"
-            "You've completed all tasks and earned 100 $IFART tokens!\n\n"
-            "🔓 You now have full access to the iFart Mini App!"
+            "You've successfully completed all verification steps!\n\n"
+            "🔓 The iFart Mini App is now unlocked for you!"
         )
         keyboard = [
             [InlineKeyboardButton("🚀 PLAY iFart Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
-            [InlineKeyboardButton("📊 View Earnings", callback_data="view_earnings")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
@@ -136,7 +136,7 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
             f"📸 *Step {task_index+1} Verification*\n\n"
             f"Please send a screenshot showing you completed:\n"
             f"*{task['button_text']}* {task['emoji']}\n\n"
-            "🔒 All submissions are verified before token distribution"
+            "🔒 All submissions are verified before unlocking the app"
         )
         await context.bot.send_message(
             chat_id=chat_id, 
@@ -151,8 +151,8 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         message = (
             f"{progress_bar}\n\n"
             f"{task['intro']}\n\n"
-            f"💎 *Reward:* {15 + task_index*2} $IFART\n"
-            f"⏱️ *Estimated time:* {1 + task_index} minute\n\n"
+            f"⏱️ *Estimated time:* {1 + task_index} minute\n"
+            f"🔑 *App Access:* {'Locked' if task_index < 5 else 'Almost there!'}\n\n"
             "Click the button below to complete this task:"
         )
         
@@ -200,16 +200,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         user_progress[user_id] += 1
         await advance_flow(context, user_id)
-    elif query.data == "view_earnings":
-        await query.edit_message_text(
-            text="💰 *Your iFart Earnings*\n\n"
-                 "▫️ Task Completion: 100 $IFART\n"
-                 "▫️ Daily Mining: 0 $IFART\n"
-                 "▫️ Referrals: 0 $IFART\n\n"
-                 "Total Balance: 100 $IFART\n\n"
-                 "Withdrawals available after 500 $IFART",
-            parse_mode='Markdown'
-        )
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
@@ -218,19 +208,17 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     if is_screenshot_step:
         task_index = step // 2
-        reward = 15 + task_index*2
         
         # Create confirmation message
         confirmation = (
             f"✅ *Verification Received!*\n\n"
-            f"Thank you for completing Step {task_index+1}!\n"
-            f"🎁 You earned: *{reward} $IFART*\n\n"
-            f"Your total earnings: *{100 if task_index == 5 else (task_index+1)*17} $IFART*"
+            f"Step {task_index+1} completed successfully!\n\n"
+            f"{6 - (task_index+1)} steps remaining to unlock the app"
         )
         
         # Add animation effect
         for i in range(3):
-            await update.message.reply_text("⏳ Verifying" + "." * (i+1))
+            await update.message.reply_text("🔍 Verifying" + "." * (i+1))
             await asyncio.sleep(0.5)
         
         await context.bot.send_message(
@@ -255,15 +243,11 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
     
     reminder_message = (
         "⏰ *Daily Reminder!*\n\n"
-        "Your iFart tokens are waiting! Don't forget to mine today:\n\n"
-        "▫️ Daily mining bonus: 10 $IFART\n"
-        "▫️ Streak bonus: 5 $IFART\n\n"
-        "Tap below to start mining now! 👇"
+        "The iFart Mini App is waiting for you! Don't forget to play today 👇"
     )
     
     keyboard = [
-        [InlineKeyboardButton("⛏️ Mine Now", web_app=WebAppInfo(url=MINI_APP_URL))],
-        [InlineKeyboardButton("📊 View Portfolio", callback_data="view_earnings")]
+        [InlineKeyboardButton("🚀 Play Now", web_app=WebAppInfo(url=MINI_APP_URL))],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
