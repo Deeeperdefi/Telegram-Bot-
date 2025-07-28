@@ -6,11 +6,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 # --- Configuration ---
-# Reads the variables from Render's Environment tab.
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-# --- Your Links (Updated as per your request) ---
-# Main social links
+# --- Updated Links with Emojis ---
 YOUTUBE_URL = "https://cutt.ly/GrYcicUY"
 X_URL = "https://x.com/ifarttoken"
 FACEBOOK_URL = "https://web.facebook.com/cryptoadvertiser11"
@@ -21,11 +19,7 @@ MINI_APP_URL = "https://venerable-basbousa-d50332.netlify.app/"
 TELEGRAM_GROUP_URL = "https://t.me/+h2YUHTxOo7ZlYWE8"
 TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken"
 
-
-# --- Bot Data Storage (for demonstration) ---
-# user_progress maps user_id to their current step.
-# Even numbers (0, 2, 4...) are for performing a task.
-# Odd numbers (1, 3, 5...) are for submitting a screenshot for that task.
+# --- Bot Data Storage ---
 user_progress = {}
 daily_reminder_users = set()
 
@@ -35,169 +29,283 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Task Definitions ---
+# --- Modern Task Definitions ---
 TASKS = [
     {
         "name": "group",
-        "intro": "1️⃣ First, please join our official Telegram Group. Click the button below, then come back and click 'Done' to submit your proof.",
-        "button_text": "Join Group 💬",
+        "intro": "🌟 *Step 1/6: Join Our Community*\n\nJoin our exclusive Telegram group to connect with other iFart enthusiasts and get the latest updates!",
+        "button_text": "✨ Join Group",
         "url": TELEGRAM_GROUP_URL,
+        "emoji": "💬"
     },
     {
         "name": "channel",
-        "intro": "2️⃣ Excellent! Now, please join our official Telegram Channel. Click the button below, then come back and click 'Done'.",
-        "button_text": "Join Channel 📢",
+        "intro": "🚀 *Step 2/6: Stay Updated*\n\nSubscribe to our official Telegram channel for important announcements and exclusive content!",
+        "button_text": "📢 Join Channel",
         "url": TELEGRAM_CHANNEL_URL,
+        "emoji": "📢"
     },
     {
         "name": "sponsor",
-        "intro": "3️⃣ Please visit our sponsor's site. Stay on the site for at least 30 seconds, then come back and click 'Done'.",
-        "button_text": "Visit our Sponsor ❤️",
+        "intro": "💎 *Step 3/6: Support Our Sponsor*\n\nVisit our sponsor's website for 30 seconds to help keep iFart running!",
+        "button_text": "❤️ Visit Sponsor",
         "url": SPONSOR_URL,
+        "emoji": "🤝"
     },
     {
         "name": "youtube",
-        "intro": "4️⃣ Next, please subscribe to our YouTube Channel. Click the button below, then come back and click 'Done'.",
-        "button_text": "Subscribe on YouTube 🎬",
+        "intro": "🎬 *Step 4/6: Subscribe on YouTube*\n\nWatch our latest videos and tutorials to maximize your iFart experience!",
+        "button_text": "🎥 Subscribe",
         "url": YOUTUBE_URL,
+        "emoji": "📺"
     },
     {
         "name": "twitter",
-        "intro": "5️⃣ Almost there! Follow our X (Twitter) profile. Click the button below, then come back and click 'Done'.",
-        "button_text": "Follow on X 🐦",
+        "intro": "🐦 *Step 5/6: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
+        "button_text": "📱 Follow Us",
         "url": X_URL,
+        "emoji": "🐦"
     },
     {
         "name": "facebook",
-        "intro": "6️⃣ Last one! Please like our Facebook page. Click the button below, then come back and click 'Done'.",
-        "button_text": "Like on Facebook �",
+        "intro": "👍 *Step 6/6: Like on Facebook*\n\nConnect with our growing community on Facebook!",
+        "button_text": "👍 Like Page",
         "url": FACEBOOK_URL,
+        "emoji": "👍"
     }
 ]
 
-# --- Helper Function to manage conversation flow ---
+# --- Visual Elements ---
+WELCOME_MESSAGE = """
+🎉 *Welcome to iFart Token!* 🎉
+
+Earn $IFART tokens by completing simple social tasks. Complete all 6 steps to unlock the iFart Mini App!
+
+📊 *Your Progress:* 0/6 tasks completed
+💰 *Potential Earnings:* 100 $IFART
+
+Let's get started with the first task!
+"""
+
+PROGRESS_BAR = {
+    0: "🟦⬜⬜⬜⬜⬜ 0%",
+    1: "🟦🟦⬜⬜⬜⬜ 16%",
+    2: "🟦🟦🟦⬜⬜⬜ 33%",
+    3: "🟦🟦🟦🟦⬜⬜ 50%",
+    4: "🟦🟦🟦🟦🟦⬜ 66%",
+    5: "🟦🟦🟦🟦🟦🟦 83%",
+    6: "🟩🟩🟩🟩🟩🟩 100%"
+}
+
+# --- Helper Functions ---
+def get_progress_bar(progress):
+    return PROGRESS_BAR.get(progress, PROGRESS_BAR[0])
+
 async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Determines what message to send based on the user's progress."""
     step = user_progress.get(chat_id, 0)
     task_index = step // 2
     is_screenshot_step = step % 2 != 0
 
     if task_index >= len(TASKS):
-        # User has finished all tasks and screenshots
         user_progress[chat_id] = 99
         if chat_id not in daily_reminder_users:
             daily_reminder_users.add(chat_id)
-            logger.info(f"User {chat_id} completed all tasks and was added to reminder list.")
+            logger.info(f"User {chat_id} completed all tasks")
 
-        final_message = "🎉 Congratulations! You have completed all the tasks. You now have access to the iFart Mini App!"
-        keyboard = [[InlineKeyboardButton("🚀 PLAY iFart Mini App!", web_app=WebAppInfo(url=MINI_APP_URL))]]
+        final_message = (
+            "🎊 *Congratulations!* 🎊\n\n"
+            "You've completed all tasks and earned 100 $IFART tokens!\n\n"
+            "🔓 You now have full access to the iFart Mini App!"
+        )
+        keyboard = [
+            [InlineKeyboardButton("🚀 PLAY iFart Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
+            [InlineKeyboardButton("📊 View Earnings", callback_data="view_earnings")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(chat_id=chat_id, text=final_message, reply_markup=reply_markup)
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=final_message, 
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
         return
 
     if is_screenshot_step:
-        # Ask for a screenshot
-        screenshot_request_text = (
-            f"👍 Now, please send a screenshot as proof for **Task {task_index + 1}**.\n\n"
-            "⚠️ *All submissions will be reviewed by our team before your airdrop withdrawal is processed. Honest participation is required.*"
-        )
-        await context.bot.send_message(chat_id=chat_id, text=screenshot_request_text, parse_mode='Markdown')
-    else:
-        # Send the next task
         task = TASKS[task_index]
+        screenshot_request_text = (
+            f"📸 *Step {task_index+1} Verification*\n\n"
+            f"Please send a screenshot showing you completed:\n"
+            f"*{task['button_text']}* {task['emoji']}\n\n"
+            "🔒 All submissions are verified before token distribution"
+        )
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=screenshot_request_text, 
+            parse_mode='Markdown'
+        )
+    else:
+        task = TASKS[task_index]
+        progress = task_index
+        progress_bar = get_progress_bar(progress)
+        
+        message = (
+            f"{progress_bar}\n\n"
+            f"{task['intro']}\n\n"
+            f"💎 *Reward:* {15 + task_index*2} $IFART\n"
+            f"⏱️ *Estimated time:* {1 + task_index} minute\n\n"
+            "Click the button below to complete this task:"
+        )
+        
         buttons = [
-            [InlineKeyboardButton(task["button_text"], url=task["url"])],
-            [InlineKeyboardButton("✅ Done, Ready to Send Proof", callback_data="request_proof")]
+            [InlineKeyboardButton(f"{task['button_text']} {task['emoji']}", url=task["url"])],
+            [InlineKeyboardButton("✅ I've Completed This", callback_data="request_proof")]
         ]
         reply_markup = InlineKeyboardMarkup(buttons)
-        await context.bot.send_message(chat_id=chat_id, text=task["intro"], reply_markup=reply_markup)
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=message, 
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
 
-
-# --- Command and Callback Handlers ---
+# --- Command Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the /start command, beginning the task sequence."""
     user = update.effective_user
     chat_id = user.id
-    logger.info(f"User {user.first_name} ({chat_id}) started the bot.")
+    logger.info(f"User {user.first_name} started the bot.")
     
+    # Send welcome message with modern UI
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=WELCOME_MESSAGE,
+        parse_mode='Markdown'
+    )
+    
+    # Send initial task after a short delay
     user_progress[chat_id] = 0
+    await asyncio.sleep(1.5)
     await advance_flow(context, chat_id)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the press of the 'Done' button."""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     
     if query.data == "request_proof":
-        # Delete the old message with the buttons
-        await query.message.delete()
-        # Move user to the screenshot submission stage for the current task
+        try:
+            await query.message.delete()
+        except:
+            logger.warning("Couldn't delete message")
+        
         user_progress[user_id] += 1
         await advance_flow(context, user_id)
+    elif query.data == "view_earnings":
+        await query.edit_message_text(
+            text="💰 *Your iFart Earnings*\n\n"
+                 "▫️ Task Completion: 100 $IFART\n"
+                 "▫️ Daily Mining: 0 $IFART\n"
+                 "▫️ Referrals: 0 $IFART\n\n"
+                 "Total Balance: 100 $IFART\n\n"
+                 "Withdrawals available after 500 $IFART",
+            parse_mode='Markdown'
+        )
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles when a user sends a photo."""
     user_id = update.effective_user.id
     step = user_progress.get(user_id, -1)
     is_screenshot_step = step % 2 != 0
 
     if is_screenshot_step:
-        # Send the warning/confirmation message
-        await update.message.reply_text(
-            "✅ Thank you! Your proof has been received and will be reviewed by our team. Here is the next task."
+        task_index = step // 2
+        reward = 15 + task_index*2
+        
+        # Create confirmation message
+        confirmation = (
+            f"✅ *Verification Received!*\n\n"
+            f"Thank you for completing Step {task_index+1}!\n"
+            f"🎁 You earned: *{reward} $IFART*\n\n"
+            f"Your total earnings: *{100 if task_index == 5 else (task_index+1)*17} $IFART*"
         )
-        # Move user to the next task
+        
+        # Add animation effect
+        for i in range(3):
+            await update.message.reply_text("⏳ Verifying" + "." * (i+1))
+            await asyncio.sleep(0.5)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=confirmation,
+            parse_mode='Markdown'
+        )
+        
+        # Move to next task
         user_progress[user_id] += 1
+        await asyncio.sleep(1.5)
         await advance_flow(context, user_id)
     else:
-        # Ignore photos sent at the wrong time
-        logger.info(f"User {user_id} sent a photo, but it was not expected.")
+        await update.message.reply_text(
+            "⚠️ Please complete your current task first before sending screenshots",
+            parse_mode='Markdown'
+        )
 
-
-# --- Daily Reminder Functionality ---
+# --- Daily Reminder ---
 async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a reminder message to all users who have completed the tasks."""
-    logger.info(f"Running daily reminder job. Sending to {len(daily_reminder_users)} users.")
+    logger.info(f"Sending daily reminders to {len(daily_reminder_users)} users")
     
-    reminder_message = "⏰ Daily Reminder!\n\nHey, don't forget to mine today in the iFart app, or you might miss your earnings! 💨💰"
-    keyboard = [[InlineKeyboardButton("Mine Now! 🚀", web_app=WebAppInfo(url=MINI_APP_URL))]]
+    reminder_message = (
+        "⏰ *Daily Reminder!*\n\n"
+        "Your iFart tokens are waiting! Don't forget to mine today:\n\n"
+        "▫️ Daily mining bonus: 10 $IFART\n"
+        "▫️ Streak bonus: 5 $IFART\n\n"
+        "Tap below to start mining now! 👇"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("⛏️ Mine Now", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [InlineKeyboardButton("📊 View Portfolio", callback_data="view_earnings")]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    for chat_id in daily_reminder_users:
+    for chat_id in daily_reminder_users.copy():
         try:
-            await context.bot.send_message(chat_id=chat_id, text=reminder_message, reply_markup=reply_markup)
-            logger.info(f"Sent reminder to {chat_id}")
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=reminder_message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
         except Exception as e:
-            logger.error(f"Failed to send message to {chat_id}: {e}")
-            if "bot was blocked" in str(e):
-                daily_reminder_users.remove(chat_id)
-                logger.info(f"Removed blocked user {chat_id} from reminders.")
+            logger.error(f"Failed to send to {chat_id}: {e}")
+            if "blocked" in str(e).lower():
+                daily_reminder_users.discard(chat_id)
 
 # --- Main Bot Logic ---
 def main() -> None:
-    """Start the bot and set up the daily job."""
     if not BOT_TOKEN:
-        logger.error("FATAL: BOT_TOKEN environment variable is not set.")
+        logger.error("BOT_TOKEN not set!")
         return
 
     application = Application.builder().token(BOT_TOKEN).build()
 
+    # Setup daily reminder
     job_queue = application.job_queue
     if job_queue:
         reminder_time = datetime.time(hour=9, minute=0, second=0, tzinfo=datetime.timezone.utc)
-        job_queue.run_daily(send_daily_reminder, time=reminder_time, name="daily_reminder_job")
-        logger.info(f"Daily reminder job scheduled for {reminder_time} UTC.")
+        job_queue.run_daily(send_daily_reminder, time=reminder_time)
+        logger.info(f"Daily reminders scheduled for {reminder_time} UTC")
 
-    # Register all the handlers
+    # Command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
-    # Add the new handler for photos
     application.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))
 
-    logger.info("Bot is starting...")
+    # Modern start command
+    application.add_handler(CommandHandler("menu", start))
+
+    logger.info("🚀 iFart Bot is running with modern UI...")
     application.run_polling()
 
 if __name__ == "__main__":
+    import asyncio
     main()
