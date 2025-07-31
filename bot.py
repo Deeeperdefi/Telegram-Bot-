@@ -90,7 +90,7 @@ TASKS = [
     },
     {
         "name": "twitter",
-        "intro": "🐦 *Step 5/6: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
+        "intro": "� *Step 5/6: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
         "button_text": "📱 Follow Us",
         "url": X_URL,
         "emoji": "🐦"
@@ -106,7 +106,7 @@ TASKS = [
 
 # --- Visual Elements ---
 WELCOME_MESSAGE = """
-� *Welcome to iFart Token!* 🎉
+🎉 *Welcome to iFart Token!* 🎉
 
 Complete these 6 simple steps to unlock access to the exclusive iFart Mini App!
 
