@@ -119,7 +119,7 @@ Let's get started with the first task!
 PROGRESS_BAR = {
     0: "🔒⬜⬜⬜⬜⬜ 0%",
     1: "🔓🔒⬜⬜⬜⬜ 16%",
-    2: "🔓🔓🔒⬜⬜⬜ 33%",
+    2: "🔓�🔒⬜⬜⬜ 33%",
     3: "🔓🔓🔓🔒⬜⬜ 50%",
     4: "🔓🔓🔓🔓🔒⬜ 66%",
     5: "🔓🔓🔓🔓🔓🔒 83%",
@@ -370,6 +370,7 @@ def main() -> None:
 
     job_queue = application.job_queue
     if job_queue:
+        # Schedule daily reminders at 9:00 AM UTC
         reminder_time = datetime.time(hour=9, minute=0, second=0, tzinfo=datetime.timezone.utc)
         job_queue.run_daily(send_daily_reminder, time=reminder_time)
         logger.info(f"Daily reminders scheduled for {reminder_time} UTC")
@@ -384,3 +385,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+�
