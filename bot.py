@@ -90,7 +90,7 @@ TASKS = [
     },
     {
         "name": "twitter",
-        "intro": "� *Step 5/6: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
+        "intro": "🐦 *Step 5/6: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
         "button_text": "📱 Follow Us",
         "url": X_URL,
         "emoji": "🐦"
@@ -384,4 +384,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-�
