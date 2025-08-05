@@ -41,16 +41,15 @@ except Exception as e:
 YOUTUBE_URL = "https://cutt.ly/GrYcicUY"
 X_URL = "https://x.com/ifarttoken"
 FACEBOOK_URL = "https://web.facebook.com/cryptoadvertiser11"
-SPONSOR_URL = "https://www.profitableratecpm.com/h7636fr3k?key=e9c1b80bf6645940264046b0a5f6ce72"
-MINI_APP_URL = "https://ifarttokenminiapp.xyz/" # <-- This is the updated URL
-
-# Telegram join links
-TELEGRAM_GROUP_URL = "https://t.me/+h2YUHTxOo7ZlYWE8"
 TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken"
+
+# --- [MODIFIED] Mini App URLs for iOS and Android ---
+IOS_MINI_APP_URL = "https://ifartminiappios.xyz/"
+ANDROID_MINI_APP_URL = "https://ifarttokenminiapp.xyz/"
 
 # --- Bot Data Storage ---
 user_progress = {}
-daily_reminder_users = set()
+daily_reminder_users = {} # Store chat_id and selected device
 
 # --- Setup ---
 logging.basicConfig(
@@ -58,72 +57,56 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Modern Task Definitions ---
+# --- [MODIFIED] Modern Task Definitions (4 Tasks) ---
 TASKS = [
     {
-        "name": "group",
-        "intro": "� *Step 1/6: Join Our Community*\n\nJoin our exclusive Telegram group to connect with other iFart enthusiasts!",
-        "button_text": "✨ Join Group",
-        "url": TELEGRAM_GROUP_URL,
-        "emoji": "💬"
-    },
-    {
         "name": "channel",
-        "intro": "🚀 *Step 2/6: Stay Updated*\n\nSubscribe to our official Telegram channel for important announcements!",
+        "intro": "🚀 *Step 1/4: Stay Updated*\n\nSubscribe to our official Telegram channel for important announcements!",
         "button_text": "📢 Join Channel",
         "url": TELEGRAM_CHANNEL_URL,
         "emoji": "📢"
     },
     {
-        "name": "sponsor",
-        "intro": "💎 *Step 3/6: Support Our Sponsor*\n\nVisit our sponsor's website for 30 seconds to help keep iFart running!",
-        "button_text": "❤️ Visit Sponsor",
-        "url": SPONSOR_URL,
-        "emoji": "🤝"
-    },
-    {
         "name": "youtube",
-        "intro": "🎬 *Step 4/6: Subscribe on YouTube*\n\nWatch our latest videos to maximize your iFart experience!",
+        "intro": "🎬 *Step 2/4: Subscribe on YouTube*\n\nWatch our latest videos to maximize your iFart experience!",
         "button_text": "🎥 Subscribe",
         "url": YOUTUBE_URL,
         "emoji": "📺"
     },
     {
         "name": "twitter",
-        "intro": "🐦 *Step 5/6: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
+        "intro": "🐦 *Step 3/4: Follow on X*\n\nStay updated with our latest tweets and crypto insights!",
         "button_text": "📱 Follow Us",
         "url": X_URL,
         "emoji": "🐦"
     },
     {
         "name": "facebook",
-        "intro": "👍 *Step 6/6: Like on Facebook*\n\nConnect with our growing community on Facebook!",
+        "intro": "👍 *Step 4/4: Like on Facebook*\n\nConnect with our growing community on Facebook!",
         "button_text": "👍 Like Page",
         "url": FACEBOOK_URL,
         "emoji": "👍"
     }
 ]
 
-# --- Visual Elements ---
+# --- [MODIFIED] Visual Elements ---
 WELCOME_MESSAGE = """
 🎉 *Welcome to iFart Token!* 🎉
 
-Complete these 6 simple steps to unlock access to the exclusive iFart Mini App!
+Complete these 4 simple steps to unlock access to the exclusive iFart Mini App!
 
-📊 *Your Progress:* 0/6 tasks completed
+📊 *Your Progress:* 0/4 tasks completed
 🔒 *App Status:* Locked
 
 Let's get started with the first task!
 """
 
 PROGRESS_BAR = {
-    0: "🔒⬜⬜⬜⬜⬜ 0%",
-    1: "🔓🔒⬜⬜⬜⬜ 16%",
-    2: "🔓🔓🔒⬜⬜⬜ 33%",
-    3: "🔓🔓🔓🔒⬜⬜ 50%",
-    4: "🔓🔓🔓🔓🔒⬜ 66%",
-    5: "🔓🔓🔓🔓🔓🔒 83%",
-    6: "🔓🔓🔓🔓🔓🔓 100%"
+    0: "🔒⬜⬜⬜ 0%",
+    1: "🔓🔒⬜⬜ 25%",
+    2: "🔓🔓🔒⬜ 50%",
+    3: "🔓🔓🔓🔒 75%",
+    4: "🔓🔓🔓🔓 100%"
 }
 
 # --- Helper Functions ---
@@ -151,12 +134,9 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
     is_screenshot_step = step % 2 != 0
 
     if task_index >= len(TASKS):
-        user_progress[chat_id] = 99
-        if chat_id not in daily_reminder_users:
-            daily_reminder_users.add(chat_id)
-            logger.info(f"User {chat_id} completed all tasks")
-
-        # --- [NEW] Firebase Account Creation Logic ---
+        user_progress[chat_id] = 99 # Mark as completed
+        
+        # --- Firebase Account Creation Logic ---
         if not db:
             await context.bot.send_message(chat_id=chat_id, text="Error: Could not connect to the database. Please contact support.")
             return
@@ -167,7 +147,6 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
         try:
             user_doc = user_doc_ref.get()
             if user_doc.exists:
-                # User already exists, remind them of their passcode
                 passcode = user_doc.to_dict().get('passcode', 'NOT_FOUND')
                 login_message = (
                     "✅ *Account Found!* ✅\n\n"
@@ -177,22 +156,13 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
                     "Use these in the mini app to access your account."
                 )
             else:
-                # New user, create account and passcode
                 passcode = generate_passcode()
                 new_user_data = {
-                    'passcode': passcode,
-                    'totalTokens': 0,
-                    # Add other default fields from your web app's defaultAppState
+                    'passcode': passcode, 'totalTokens': 0,
                     'spinDetails': { 'dailyEarnings': 0, 'spinsLeft': 5, 'totalSpins': 0, 'totalWon': 0, 'lastSpinDate': None, 'spinAdCounter': 0 },
-                    'lastRainPlayTime': None,
-                    'rainFartsMissed': 0,
-                    'rainEnabledByVideo': True,
-                    'socialTasks': {},
-                    'referredBy': None,
-                    'loginStreak': 0,
-                    'lastLoginDate': None,
-                    'referrerBonusAwarded': False,
-                    'lastUpdated': firestore.SERVER_TIMESTAMP
+                    'lastRainPlayTime': None, 'rainFartsMissed': 0, 'rainEnabledByVideo': True,
+                    'socialTasks': {}, 'referredBy': None, 'loginStreak': 0, 'lastLoginDate': None,
+                    'referrerBonusAwarded': False, 'lastUpdated': firestore.SERVER_TIMESTAMP
                 }
                 user_doc_ref.set(new_user_data)
                 login_message = (
@@ -210,15 +180,18 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
             await context.bot.send_message(chat_id=chat_id, text="A server error occurred while creating your account. Please try again later.")
             return
 
-        # --- Final Message with Play Button ---
-        final_message = "🔓 The iFart Mini App is now unlocked for you!"
+        # --- [NEW] Device Selection Step ---
+        device_selection_message = "📱 *Almost there!* Select your device to get the correct version of the iFart Mini App."
         keyboard = [
-            [InlineKeyboardButton("🚀 PLAY iFart Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
+            [
+                InlineKeyboardButton("🍏 iOS", callback_data="select_ios"),
+                InlineKeyboardButton("🤖 Android", callback_data="select_android")
+            ],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
-            chat_id=chat_id, 
-            text=final_message, 
+            chat_id=chat_id,
+            text=device_selection_message,
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -246,7 +219,7 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
             f"{progress_bar}\n\n"
             f"{task['intro']}\n\n"
             f"⏱️ *Estimated time:* {1 + task_index} minute\n"
-            f"🔑 *App Access:* {'Locked' if task_index < 5 else 'Almost there!'}\n\n"
+            f"🔑 *App Access:* {'Locked' if task_index < 3 else 'Almost there!'}\n\n"
             "Click the button below to complete this task:"
         )
         
@@ -291,11 +264,42 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if query.data == "request_proof":
         try:
             await query.message.delete()
-        except:
-            logger.warning("Couldn't delete message")
+        except Exception:
+            logger.warning(f"Couldn't delete message for user {user.id}")
         
-        user_progress[user.id] += 1
+        user_progress[user.id] = user_progress.get(user.id, 0) + 1
         await advance_flow(context, user.id, user)
+
+# --- [NEW] Device Selection Handler ---
+async def device_selection_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    
+    chat_id = query.from_user.id
+    selection = query.data
+    
+    if selection == "select_ios":
+        app_url = IOS_MINI_APP_URL
+        device_name = "iOS"
+        daily_reminder_users[chat_id] = "ios" # Store preference
+    else: # select_android
+        app_url = ANDROID_MINI_APP_URL
+        device_name = "Android"
+        daily_reminder_users[chat_id] = "android" # Store preference
+
+    final_message = f"🔓 The iFart Mini App ({device_name}) is now unlocked for you!"
+    keyboard = [
+        [InlineKeyboardButton(f"🚀 PLAY on {device_name}", web_app=WebAppInfo(url=app_url))],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        text=final_message, 
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    logger.info(f"User {chat_id} selected {device_name} and received the app link.")
+
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -308,7 +312,7 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         confirmation = (
             f"✅ *Verification Received!*\n\n"
             f"Step {task_index+1} completed successfully!\n\n"
-            f"{6 - (task_index+1)} steps remaining to unlock the app"
+            f"{len(TASKS) - (task_index+1)} steps remaining to unlock the app"
         )
         
         for i in range(3):
@@ -330,7 +334,7 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             parse_mode='Markdown'
         )
 
-# --- Daily Reminder ---
+# --- [MODIFIED] Daily Reminder ---
 async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"Sending daily reminders to {len(daily_reminder_users)} users")
     
@@ -339,12 +343,12 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
         "The iFart Mini App is waiting for you! Don't forget to play today 👇"
     )
     
-    keyboard = [
-        [InlineKeyboardButton("🚀 Play Now", web_app=WebAppInfo(url=MINI_APP_URL))],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    for chat_id in daily_reminder_users.copy():
+    for chat_id, device in daily_reminder_users.copy().items():
+        app_url = IOS_MINI_APP_URL if device == "ios" else ANDROID_MINI_APP_URL
+        keyboard = [
+            [InlineKeyboardButton("🚀 Play Now", web_app=WebAppInfo(url=app_url))],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
@@ -355,7 +359,7 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception as e:
             logger.error(f"Failed to send to {chat_id}: {e}")
             if "blocked" in str(e).lower():
-                daily_reminder_users.discard(chat_id)
+                del daily_reminder_users[chat_id]
 
 # --- Main Bot Logic ---
 def main() -> None:
@@ -374,12 +378,14 @@ def main() -> None:
         job_queue.run_daily(send_daily_reminder, time=reminder_time)
         logger.info(f"Daily reminders scheduled for {reminder_time} UTC")
 
+    # --- [MODIFIED] Handlers with specific patterns ---
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(CallbackQueryHandler(button_handler, pattern="^request_proof$"))
+    application.add_handler(CallbackQueryHandler(device_selection_handler, pattern="^select_(ios|android)$"))
     application.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))
     application.add_handler(CommandHandler("menu", start))
 
-    logger.info("🚀 iFart Bot is running with modern UI and Firebase integration...")
+    logger.info("🚀 iFart Bot is running with updated tasks and device selection...")
     application.run_polling()
 
 if __name__ == "__main__":
