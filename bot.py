@@ -38,7 +38,7 @@ except Exception as e:
 
 
 # --- Updated Links with Emojis ---
-YOUTUBE_URL = "https://cutt.ly/GrYcicUY"
+YOUTUBE_URL = "https://www.youtube.com/@ifarttoken"
 X_URL = "https://x.com/ifarttoken"
 FACEBOOK_URL = "https://web.facebook.com/cryptoadvertiser11"
 TELEGRAM_CHANNEL_URL = "https://t.me/ifarttoken"
@@ -106,7 +106,7 @@ PROGRESS_BAR = {
     1: "🔓🔒⬜⬜ 25%",
     2: "🔓🔓🔒⬜ 50%",
     3: "🔓🔓🔓🔒 75%",
-    4: "🔓🔓🔓🔓 100%"
+    4: "🔓�🔓🔓 100%"
 }
 
 # --- Helper Functions ---
@@ -390,3 +390,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+�
