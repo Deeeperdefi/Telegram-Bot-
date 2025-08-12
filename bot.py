@@ -48,8 +48,9 @@ IOS_MINI_APP_URL = "https://ifartminiappios.xyz/"
 ANDROID_MINI_APP_URL = "https://ifarttokenminiapp.xyz/"
 
 # --- Bot Data Storage ---
+# This dictionary will only track the onboarding progress temporarily.
+# Reminder preferences will be stored in Firestore.
 user_progress = {}
-daily_reminder_users = {} # Store chat_id and selected device
 
 # --- Setup ---
 logging.basicConfig(
@@ -106,7 +107,7 @@ PROGRESS_BAR = {
     1: "🔓🔒⬜⬜ 25%",
     2: "🔓🔓🔒⬜ 50%",
     3: "🔓🔓🔓🔒 75%",
-    4: "🔓�🔓🔓 100%"
+    4: "🔓🔓🔓🔓 100%"
 }
 
 # --- Helper Functions ---
@@ -147,7 +148,13 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
         try:
             user_doc = user_doc_ref.get()
             if user_doc.exists:
-                passcode = user_doc.to_dict().get('passcode', 'NOT_FOUND')
+                user_data = user_doc.to_dict()
+                passcode = user_data.get('passcode', 'NOT_FOUND')
+                
+                # [FIX] Ensure chat_id is stored for existing users
+                if 'chat_id' not in user_data:
+                    user_doc_ref.update({'chat_id': user.id})
+
                 login_message = (
                     "✅ *Account Found!* ✅\n\n"
                     "You have already completed the tasks. Here are your login details:\n\n"
@@ -162,7 +169,10 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
                     'spinDetails': { 'dailyEarnings': 0, 'spinsLeft': 5, 'totalSpins': 0, 'totalWon': 0, 'lastSpinDate': None, 'spinAdCounter': 0 },
                     'lastRainPlayTime': None, 'rainFartsMissed': 0, 'rainEnabledByVideo': True,
                     'socialTasks': {}, 'referredBy': None, 'loginStreak': 0, 'lastLoginDate': None,
-                    'referrerBonusAwarded': False, 'lastUpdated': firestore.SERVER_TIMESTAMP
+                    'referrerBonusAwarded': False, 'lastUpdated': firestore.SERVER_TIMESTAMP,
+                    'chat_id': user.id, # [FIX] Store the user's chat_id
+                    'remindersEnabled': False, # Default to false until they choose a device
+                    'device': None
                 }
                 user_doc_ref.set(new_user_data)
                 login_message = (
@@ -181,7 +191,7 @@ async def advance_flow(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user: o
             return
 
         # --- [NEW] Device Selection Step ---
-        device_selection_message = "📱 *Almost there!* Select your device to get the correct version of the iFart Mini App."
+        device_selection_message = "📱 *Almost there!* Select your device to get the correct version of the iFart Mini App and to enable daily play reminders."
         keyboard = [
             [
                 InlineKeyboardButton("🍏 iOS", callback_data="select_ios"),
@@ -270,24 +280,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user_progress[user.id] = user_progress.get(user.id, 0) + 1
         await advance_flow(context, user.id, user)
 
-# --- [NEW] Device Selection Handler ---
+# --- [MODIFIED] Device Selection Handler with Firestore Integration ---
 async def device_selection_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     
-    chat_id = query.from_user.id
+    user = query.from_user
     selection = query.data
     
     if selection == "select_ios":
         app_url = IOS_MINI_APP_URL
         device_name = "iOS"
-        daily_reminder_users[chat_id] = "ios" # Store preference
     else: # select_android
         app_url = ANDROID_MINI_APP_URL
         device_name = "Android"
-        daily_reminder_users[chat_id] = "android" # Store preference
 
-    final_message = f"🔓 The iFart Mini App ({device_name}) is now unlocked for you!"
+    # [FIX] Persist device choice and enable reminders in Firestore
+    if db:
+        try:
+            username = user.username.lower() if user.username else f"user{user.id}"
+            user_doc_ref = db.collection('artifacts', APP_ID, 'users').document(username)
+            user_doc_ref.update({
+                'device': device_name,
+                'remindersEnabled': True
+            })
+            logger.info(f"User {user.id} ({username}) set device to {device_name} and enabled reminders.")
+        except Exception as e:
+            logger.error(f"Failed to update Firestore for user {user.id}: {e}")
+            await query.edit_message_text(text="Sorry, there was an error saving your preference. Please try again.")
+            return
+
+    final_message = f"🔓 The iFart Mini App ({device_name}) is now unlocked for you!\n\nYou will now receive daily reminders to play."
     keyboard = [
         [InlineKeyboardButton(f"🚀 PLAY on {device_name}", web_app=WebAppInfo(url=app_url))],
     ]
@@ -298,7 +321,7 @@ async def device_selection_handler(update: Update, context: ContextTypes.DEFAULT
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
-    logger.info(f"User {chat_id} selected {device_name} and received the app link.")
+    logger.info(f"User {user.id} selected {device_name} and received the app link.")
 
 
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -334,32 +357,61 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             parse_mode='Markdown'
         )
 
-# --- [MODIFIED] Daily Reminder ---
+# --- [MODIFIED] Daily Reminder using Firestore ---
 async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.info(f"Sending daily reminders to {len(daily_reminder_users)} users")
+    if not db:
+        logger.error("Cannot send reminders: Firestore client is not available.")
+        return
+
+    logger.info("CRON JOB: Starting to send daily reminders...")
     
     reminder_message = (
         "⏰ *Daily Reminder!*\n\n"
         "The iFart Mini App is waiting for you! Don't forget to play today 👇"
     )
     
-    for chat_id, device in daily_reminder_users.copy().items():
-        app_url = IOS_MINI_APP_URL if device == "ios" else ANDROID_MINI_APP_URL
-        keyboard = [
-            [InlineKeyboardButton("🚀 Play Now", web_app=WebAppInfo(url=app_url))],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=reminder_message,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
-        except Exception as e:
-            logger.error(f"Failed to send to {chat_id}: {e}")
-            if "blocked" in str(e).lower():
-                del daily_reminder_users[chat_id]
+    users_ref = db.collection('artifacts', APP_ID, 'users')
+    # Query for all users who have reminders enabled
+    query = users_ref.where('remindersEnabled', '==', True)
+    
+    try:
+        docs = query.stream()
+        users_sent = 0
+        for doc in docs:
+            user_data = doc.to_dict()
+            chat_id = user_data.get('chat_id')
+            device = user_data.get('device')
+
+            if not chat_id or not device:
+                logger.warning(f"Skipping user {doc.id} due to missing chat_id or device.")
+                continue
+
+            app_url = IOS_MINI_APP_URL if device == "iOS" else ANDROID_MINI_APP_URL
+            keyboard = [
+                [InlineKeyboardButton("🚀 Play Now", web_app=WebAppInfo(url=app_url))],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=reminder_message,
+                    reply_markup=reply_markup,
+                    parse_mode='Markdown'
+                )
+                users_sent += 1
+                await asyncio.sleep(0.1) # Avoid hitting rate limits
+            except Exception as e:
+                # If user blocked the bot, disable future reminders for them
+                if "blocked" in str(e).lower() or "user is deactivated" in str(e).lower():
+                    logger.warning(f"User {chat_id} blocked the bot. Disabling reminders.")
+                    doc.reference.update({'remindersEnabled': False})
+                else:
+                    logger.error(f"Failed to send reminder to {chat_id}: {e}")
+        logger.info(f"CRON JOB: Daily reminders sent to {users_sent} users.")
+    except Exception as e:
+        logger.error(f"CRON JOB: An error occurred while fetching users for reminders: {e}")
+
 
 # --- Main Bot Logic ---
 def main() -> None:
@@ -374,6 +426,7 @@ def main() -> None:
 
     job_queue = application.job_queue
     if job_queue:
+        # Schedule the daily reminder job. Runs every day at 9:00 AM UTC.
         reminder_time = datetime.time(hour=9, minute=0, second=0, tzinfo=datetime.timezone.utc)
         job_queue.run_daily(send_daily_reminder, time=reminder_time)
         logger.info(f"Daily reminders scheduled for {reminder_time} UTC")
@@ -385,7 +438,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))
     application.add_handler(CommandHandler("menu", start))
 
-    logger.info("🚀 iFart Bot is running with updated tasks and device selection...")
+    logger.info("🚀 iFart Bot is running with persistent reminders...")
     application.run_polling()
 
 if __name__ == "__main__":
